@@ -8,9 +8,9 @@ from skimage.metrics import structural_similarity as ssim
 
 img_part_size = 50
 num_clusters = 5
-# 使用 BRISK 特征检测器
+# 使用 SIFT 特征检测器
 brisk = cv2.SIFT_create()
-bf = cv2.BFMatcher()
+
 def count_time(f):
     def warrp(*a,**b):
         t1 = time.time()
@@ -164,10 +164,6 @@ def get_goods(bg_reisze_img,good_index_list,orign_resize_img_list,cluster_center
         result.append((left_x,right_x,left_y,right_y))
     return result
 
-
-
-
-    return result
 def binary (bg_reisze_img,orign_resize_img,side ,site,size=(320,320),is_left = False , is_x = True,is_show =False):
     """
     input :
@@ -302,12 +298,26 @@ def image_from_video( target_frame_count ,video=None ,output_folder = 'image_pre
         # 释放视频捕捉对象
         cap.release()
     return output_list
+def convert_data(size, box): # size:(原图w,原图h) , box:(xmin,xmax,ymin,ymax)
+    dw = 1./size[0]     # 1/w
+    dh = 1./size[1]     # 1/h
+    x = (box[0] + box[1])/2.0   # 物体在图中的中心点x坐标
+    y = (box[2] + box[3])/2.0   # 物体在图中的中心点y坐标
+    w = box[1] - box[0]         # 物体实际像素宽度
+    h = box[3] - box[2]         # 物体实际像素高度
+    x = x*dw    # 物体中心点x的坐标比(相当于 x/原图w)
+    w = w*dw    # 物体宽度的宽度比(相当于 w/原图w)
+    y = y*dh    # 物体中心点y的坐标比(相当于 y/原图h)
+    h = h*dh    # 物体宽度的宽度比(相当于 h/原图h)
+    return (x, y, w, h)    # 返回 相对于原图的物体中心点的x坐标比,y坐标比,宽度比,高度比,取值范围[0-1]
+
+label_flie_path  = 'label'
 @count_time
-def main():
+def main(is_yolo = False,label_index = "0" ):
     image_delete_local("image_goods")
     image_delete_local("image_pre")
     img_list = image_from_video(20)
-    bg = cv2.imread("label/bg.jpg")
+    bg = cv2.imread("image_bg/bg.jpg")
     bg_reisze_img= cv2.resize(bg ,(320,320))
     
     orign_resize_img_list= resize_list(img_list)
@@ -332,6 +342,10 @@ def main():
         x_min,x_max,y_min,y_max = goods_border[index]
         good_img_path  = "image_goods"+ '/' + f"{index}" + ".jpg"
         cv2.imwrite(good_img_path,orign_resize_img_list[index][y_min:y_max,x_min:x_max])
+        if is_yolo:
+            bb = convert_data((320,320),(x_min,x_max,y_min,y_max))
+            with open(label_flie_path + "/"+f"{index}" + ".txt", 'w') as label_file:
+                label_file.write(label_index + " " + " ".join([str(a) for a in bb]) + '\n')
 
 if __name__ == "__main__":
-    main()
+    main(is_yolo = True )
