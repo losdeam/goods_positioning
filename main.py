@@ -18,7 +18,6 @@ def count_time(f):
         print(f.__name__,"耗时",time.time()-t1)
         return t
     return warrp
-
 def get_cluster_centers(img,show = False ):
     '''
     获取图像中关键点的聚类中心
@@ -39,20 +38,21 @@ def get_cluster_centers(img,show = False ):
     if show : 
         # 在原图上标记检测点
         img_with_keypoints = img.copy()
+        img_with_Cluster  = img.copy()
         img_with_keypoints = cv2.drawKeypoints(img, keypoints, img_with_keypoints)
-
+        cv2.imshow('Image with Keypoints', img_with_keypoints)
         # 在原图上标记聚类中心
         for center in cluster_centers:
+            
             center_coordinates = tuple(map(int, center))
-            img_with_keypoints = cv2.circle(img_with_keypoints, center_coordinates, 10, (0, 255, 0), -1)
+            img_with_Cluster = cv2.circle(img_with_Cluster, center_coordinates, 6, (255, 255, 255), -1)
 
         # 显示带有标记的图像
-        cv2.imshow('Image with Keypoints and Cluster Centers', img_with_keypoints)
+        cv2.imshow('Image with Cluster Centers', img_with_Cluster)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
     return cluster_centers
-
 def get_center_img(orign_resize_img,center_list,show = False):
     '''
     根据所给坐标在图像中截取一定大小的片段
@@ -106,7 +106,6 @@ def find_goods_centers(bg,cluster_center_img_list):
         bg : 灰色背景图
         cluster_center_img_list：聚类中心的图片列表
     '''
-    # 先通过一次遍历来寻找第一张图中商品的聚类中心
     #--------------------------
     #直接通过判断聚类中心与背景的相似度即可
     # 越不像的越可能是商品位置
@@ -115,14 +114,14 @@ def find_goods_centers(bg,cluster_center_img_list):
     # 寻找相似度最低的聚类中心
     match_list = [1]*n
     good_cluster_list = [None] *n
+    bg_resize_img = cv2.resize(bg, (img_part_size*2,img_part_size*2))
     # 遍历图像
     for i in range(n):
         min_match = 1
         #遍历当前图像的所有聚类中心图像
         for index,cluster_center_img in enumerate(cluster_center_img_list[i]):
                 # 提取当前图像的关键点和描述符
-                cluster_center_img_resize = cv2.resize(cluster_center_img, (320,320))
-                similarity = ssim(bg, cluster_center_img_resize,channel_axis =2 )
+                similarity = ssim(bg_resize_img, cluster_center_img,channel_axis =2 )
                 if  similarity <= min_match:
                     min_match = similarity
                     match_list[i] = index
@@ -151,19 +150,18 @@ def get_goods(bg_reisze_img,good_index_list,orign_resize_img_list,cluster_center
         left_x,right_x,left_y,right_y = cluster_border_list[index][i]
         left_x = binary (bg_reisze_img,orign_resize_img,(left_y,right_y) ,center_x,size=size,is_left =  False , is_x = True,is_show= is_show)
         right_x = binary (bg_reisze_img,orign_resize_img,(left_y,right_y) ,center_x,size=size,is_left = True ,is_x = True, is_show= is_show)
-        if is_show: 
-            print(1111)
-            cv2.imshow('1',orign_resize_img[:,left_x:right_x,:])
-            cv2.waitKey(0)
+        # if is_show: 
+        #     print(1111)
+        #     cv2.imshow('1',orign_resize_img[:,left_x:right_x,:])
+        #     cv2.waitKey(100)
         left_y = binary (bg_reisze_img,orign_resize_img,(left_x,right_x) ,center_y,size=size,is_left = False , is_x = False,is_show= is_show)
         right_y = binary (bg_reisze_img,orign_resize_img,(left_x,right_x) ,center_y,size=size,is_left = True, is_x = False,is_show= is_show)
-        if is_show:
-            print(index)
-            cv2.imshow('test',orign_resize_img[left_y:right_y,left_x:right_x,:])
-            cv2.waitKey(0)
+        # if is_show:
+        #     print(index)
+        #     cv2.imshow('test',orign_resize_img[left_y:right_y,left_x:right_x,:])
+        #     cv2.waitKey(100)
         result.append((left_x,right_x,left_y,right_y))
     return result
-
 def binary (bg_reisze_img,orign_resize_img,side ,site,size=(320,320),is_left = False , is_x = True,is_show =False):
     """
     input :
@@ -207,14 +205,11 @@ def binary (bg_reisze_img,orign_resize_img,side ,site,size=(320,320),is_left = F
 
         similarity = ssim(img_r, img_bg,channel_axis =2)    
         if is_show:
-            print(mid,right,side[0],side[1],is_x,is_left)
             cv2.imshow("l",t1)
             cv2.imshow("r",t2)
             cv2.imshow("img_r",img_r)
             cv2.imshow('img_bg',img_bg)
-            cv2.waitKey(0)
-
-            print(img_r.shape,similarity)
+            cv2.waitKey(200)
         if similarity > 0.90 :
             if is_left:
                 right = mid 
@@ -331,13 +326,13 @@ def main(is_yolo = False,label_index = "0" ):
         # 寻找聚类中心
         cluster_centers = get_cluster_centers(orign_resize_img,show=False )
         # 获取聚类中心图像
-        cluster_center_img,cluster_border = get_center_img(orign_resize_img,cluster_centers,show = False )
+        cluster_center_img,cluster_border = get_center_img(orign_resize_img,cluster_centers,show = False  )
         cluster_center_img_list.append(cluster_center_img)
         cluster_border_list.append(cluster_border)
         cluster_center_list.append(cluster_centers)
 
     goods_index_list,goods_cluster_list = find_goods_centers(bg_reisze_img,cluster_center_img_list)
-    goods_border = get_goods(bg_reisze_img,goods_index_list,orign_resize_img_list,cluster_center_list,cluster_border_list,is_show=False )
+    goods_border = get_goods(bg_reisze_img,goods_index_list,orign_resize_img_list,cluster_center_list,cluster_border_list,is_show=False  )
     for index,i in enumerate(goods_index_list):
         x_min,x_max,y_min,y_max = goods_border[index]
         good_img_path  = "image_goods"+ '/' + f"{index}" + ".jpg"
